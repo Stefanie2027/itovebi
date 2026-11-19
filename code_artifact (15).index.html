@@ -1,0 +1,1492 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>伊赫莱® 药师随访与血糖管理工作台</title>
+    <!-- 引入 Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入 FontAwesome 图标库 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- 引入 Inter 字体 -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+            background-color: #f3f6f9;
+            -webkit-tap-highlight-color: transparent;
+        }
+        /* 自定义滚动条 */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        /* 隐藏数字输入框箭头 */
+        input[type=number]::-webkit-inner-spin-button, 
+        input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+        }
+    </style>
+</head>
+<body class="text-slate-800 antialiased pb-20 md:pb-6">
+
+    <!-- 顶部导航栏 -->
+    <header class="bg-gradient-to-r from-emerald-800 via-teal-800 to-cyan-900 text-white shadow-lg sticky top-0 z-30">
+        <div class="max-w-6xl mx-auto px-4 py-3.5 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center border border-white/20 shadow-inner">
+                    <i class="fa-solid fa-notes-medical text-emerald-300 text-xl"></i>
+                </div>
+                <div>
+                    <div class="flex items-center space-x-2">
+                        <h1 class="font-bold text-lg tracking-tight">伊赫莱® 药师随访助手</h1>
+                        <span class="text-[10px] bg-emerald-500/30 border border-emerald-400/40 text-emerald-100 px-2 py-0.5 rounded-full font-medium">SOP 2026版</span>
+                    </div>
+                    <p class="text-xs text-teal-200/90">PI3Kα抑制剂全周期血糖及不良反应规范化管理</p>
+                </div>
+            </div>
+            <div class="flex items-center space-x-2">
+                <button onclick="openSopModal()" class="bg-white/10 hover:bg-white/20 active:scale-95 transition text-xs px-3 py-2 rounded-xl border border-white/15 flex items-center space-x-1.5">
+                    <i class="fa-solid fa-book-medical text-amber-300"></i>
+                    <span class="hidden sm:inline">SOP处置规范</span>
+                    <span class="sm:hidden">SOP</span>
+                </button>
+                <button onclick="openNewPatientModal()" class="bg-emerald-500 hover:bg-emerald-400 active:scale-95 transition text-white font-semibold text-xs sm:text-sm px-3.5 py-2 rounded-xl shadow-md flex items-center space-x-1.5">
+                    <i class="fa-solid fa-user-plus"></i>
+                    <span>首次建档</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- 主容器 -->
+    <main class="max-w-6xl mx-auto px-4 pt-5 space-y-5">
+
+        <!-- 顶部核心指标概览卡片 -->
+        <section class="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4" id="dashboardStats">
+            <!-- 动态渲染统计卡片 -->
+        </section>
+
+        <!-- 视图切换 Tabs (患者列表 / 今日随访待办 / 决策速查工具) -->
+        <div class="bg-white p-1.5 rounded-2xl shadow-sm border border-slate-200/80 flex space-x-1">
+            <button onclick="switchMainTab('patients')" id="tab-patients" class="flex-1 py-2.5 px-3 rounded-xl text-sm font-semibold transition flex items-center justify-center space-x-2 bg-teal-700 text-white shadow-sm">
+                <i class="fa-solid fa-users"></i>
+                <span>在管患者档案</span>
+            </button>
+            <button onclick="switchMainTab('todos')" id="tab-todos" class="flex-1 py-2.5 px-3 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-100 transition flex items-center justify-center space-x-2">
+                <i class="fa-solid fa-bell"></i>
+                <span>随访提醒日程</span>
+                <span id="todoBadge" class="bg-rose-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">0</span>
+            </button>
+            <button onclick="switchMainTab('calculator')" id="tab-calculator" class="flex-1 py-2.5 px-3 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-100 transition flex items-center justify-center space-x-2">
+                <i class="fa-solid fa-calculator"></i>
+                <span>即时决策评估器</span>
+            </button>
+        </div>
+
+        <!-- 视图 1：患者档案列表与管理 -->
+        <div id="view-patients" class="space-y-4">
+            <!-- 搜索与筛选栏 -->
+            <div class="flex flex-col sm:flex-row gap-3">
+                <div class="relative flex-1">
+                    <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+                    <input type="text" id="searchInput" oninput="renderPatientList()" placeholder="搜索患者姓名、编号、手机号或主治医生..." class="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/40 focus:border-teal-600">
+                </div>
+                <div class="flex space-x-2 overflow-x-auto pb-1 sm:pb-0">
+                    <button onclick="setRiskFilter('ALL')" class="filter-btn active px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-800 text-white whitespace-nowrap" data-filter="ALL">全部患者</button>
+                    <button onclick="setRiskFilter('ALERT')" class="filter-btn px-3.5 py-2 rounded-xl text-xs font-semibold bg-white text-rose-600 border border-rose-200 hover:bg-rose-50 whitespace-nowrap" data-filter="ALERT">🚨 血糖超标(>8.9)</button>
+                    <button onclick="setRiskFilter('HIGH')" class="filter-btn px-3.5 py-2 rounded-xl text-xs font-semibold bg-white text-amber-700 border border-amber-200 hover:bg-amber-50 whitespace-nowrap" data-filter="HIGH">⚠️ 高危基线</button>
+                </div>
+            </div>
+
+            <!-- 患者卡片列表容器 -->
+            <div id="patientListContainer" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <!-- 动态渲染患者卡片 -->
+            </div>
+        </div>
+
+        <!-- 视图 2：随访提醒日程 -->
+        <div id="view-todos" class="hidden space-y-4">
+            <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200/80">
+                <div class="flex items-center justify-between mb-4">
+                    <div>
+                        <h2 class="font-bold text-base text-slate-800">标准化随访周期日程表</h2>
+                        <p class="text-xs text-slate-500 mt-0.5">基于共识频率：W1每3天 | W2-4每周 | M2-3每2周 | M4+每28天（异常加密至2-3天）</p>
+                    </div>
+                </div>
+                <div id="todoListContainer" class="space-y-3">
+                    <!-- 动态渲染待随访列表 -->
+                </div>
+            </div>
+        </div>
+
+        <!-- 视图 3：即时血糖决策评估器（无需建档即可快速查询SOP处置） -->
+        <div id="view-calculator" class="hidden">
+            <div class="bg-white rounded-2xl p-5 sm:p-6 shadow-sm border border-slate-200/80 max-w-3xl mx-auto space-y-5">
+                <div class="border-b border-slate-100 pb-4">
+                    <h2 class="font-bold text-lg text-slate-800 flex items-center space-x-2">
+                        <i class="fa-solid fa-stethoscope text-teal-600"></i>
+                        <span>伊那利塞高血糖即时决策引擎</span>
+                    </h2>
+                    <p class="text-xs text-slate-500 mt-1">输入患者当前空腹血糖（FPG）及临床症状，自动匹配CTCAE分级、剂量调整建议及医患沟通话术。</p>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1.5">当前空腹血糖 FPG (mmol/L) *</label>
+                        <input type="number" step="0.1" id="quickFpgInput" oninput="runQuickDecision()" placeholder="例如：9.6" class="w-full px-4 py-3 text-lg font-bold text-teal-900 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1.5">高血糖/酮症危险症状筛查</label>
+                        <div class="grid grid-cols-2 gap-2 text-xs">
+                            <label class="flex items-center space-x-2 p-2.5 rounded-xl border border-slate-200 bg-slate-50 cursor-pointer">
+                                <input type="checkbox" id="quickSymThirst" onchange="runQuickDecision()" class="rounded text-teal-600">
+                                <span>口渴/多尿/乏力</span>
+                            </label>
+                            <label class="flex items-center space-x-2 p-2.5 rounded-xl border border-rose-200 bg-rose-50/50 text-rose-800 cursor-pointer font-medium">
+                                <input type="checkbox" id="quickSymDka" onchange="runQuickDecision()" class="rounded text-rose-600">
+                                <span>恶心呕吐/腹痛/呼吸深快</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 实时输出结果面板 -->
+                <div id="quickDecisionOutput" class="rounded-2xl p-5 bg-slate-50 border border-slate-200 text-center text-sm text-slate-400">
+                    请在上方输入空腹血糖数值以获取标准化处置方案
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- ==================== 模态框 1：首次购药建档 & 基线高危评估 ==================== -->
+    <div id="newPatientModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+        <div class="bg-white rounded-3xl max-w-2xl w-full max-h-[92vh] overflow-y-auto shadow-2xl border border-slate-100">
+            <div class="sticky top-0 bg-white/95 backdrop-blur px-6 py-4 border-b border-slate-100 flex items-center justify-between z-10">
+                <div>
+                    <h3 class="font-bold text-lg text-slate-800">首次购药建档与高血糖风险评估</h3>
+                    <p class="text-xs text-slate-500">SOP 步骤①：核查基线指标、评估危险因素、发放关爱包</p>
+                </div>
+                <button onclick="closeModal('newPatientModal')" class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <form id="newPatientForm" onsubmit="saveNewPatient(event)" class="p-6 space-y-5">
+                <!-- 基本信息 -->
+                <div>
+                    <h4 class="text-xs font-bold uppercase tracking-wider text-teal-700 mb-3 flex items-center">
+                        <span class="w-5 h-5 rounded-full bg-teal-100 text-teal-700 inline-flex items-center justify-center mr-1.5 text-[11px]">1</span>
+                        患者基础与用药信息
+                    </h4>
+                    <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                        <div>
+                            <label class="block text-xs font-medium text-slate-700 mb-1">患者姓名 *</label>
+                            <input type="text" id="pName" required placeholder="如：王秀兰" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-700 mb-1">年龄 (岁) *</label>
+                            <input type="number" id="pAge" required oninput="evaluateBaselineRisk()" placeholder="如：56" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm">
+                        </div>
+                        <div class="col-span-2 sm:col-span-1">
+                            <label class="block text-xs font-medium text-slate-700 mb-1">联系电话 *</label>
+                            <input type="tel" id="pPhone" required placeholder="138xxxx8888" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-700 mb-1">首次服药日期 *</label>
+                            <input type="date" id="pStartDate" required class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-700 mb-1">伊那利塞起始剂量</label>
+                            <select id="pDose" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm">
+                                <option value="9mg QD">9mg 每日一次 (标准起始)</option>
+                                <option value="6mg QD">6mg 每日一次 (中度肾损/首次减量)</option>
+                                <option value="3mg QD">3mg 每日一次 (二次减量)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-700 mb-1">主治医生 / 科室</label>
+                            <input type="text" id="pDoctor" placeholder="如：李主任-乳腺外科" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 基线实验室检查 -->
+                <div>
+                    <h4 class="text-xs font-bold uppercase tracking-wider text-teal-700 mb-3 flex items-center">
+                        <span class="w-5 h-5 rounded-full bg-teal-100 text-teal-700 inline-flex items-center justify-center mr-1.5 text-[11px]">2</span>
+                        基线血糖与肾功能核查
+                    </h4>
+                    <div class="grid grid-cols-3 gap-3">
+                        <div>
+                            <label class="block text-xs font-medium text-slate-700 mb-1">基线 FPG (mmol/L) *</label>
+                            <input type="number" step="0.1" id="pBaseFpg" required oninput="evaluateBaselineRisk()" placeholder="如：5.6" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-700 mb-1">基线 HbA1c (%) *</label>
+                            <input type="number" step="0.1" id="pBaseHba1c" required oninput="evaluateBaselineRisk()" placeholder="如：5.8" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-700 mb-1">BMI (kg/m²)</label>
+                            <input type="number" step="0.1" id="pBmi" oninput="evaluateBaselineRisk()" placeholder="如：26.5" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 高血糖危险因素评估卡 (SOP标准) -->
+                <div class="bg-amber-50/70 border border-amber-200/80 rounded-2xl p-4">
+                    <div class="flex items-center justify-between mb-2.5">
+                        <h4 class="text-xs font-bold text-amber-900 flex items-center space-x-1.5">
+                            <i class="fa-solid fa-clipboard-check text-amber-600"></i>
+                            <span>高血糖危险因素评估卡（≥1项阳性即判定为高风险）</span>
+                        </h4>
+                        <span id="riskResultBadge" class="text-xs font-bold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800">低风险</span>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-slate-700">
+                        <label class="flex items-center space-x-2 bg-white p-2 rounded-xl border border-amber-100 cursor-pointer">
+                            <input type="checkbox" class="risk-checkbox rounded text-amber-600" value="糖尿病/糖尿病前期" onchange="evaluateBaselineRisk()">
+                            <span>糖尿病 / 糖尿病前期病史</span>
+                        </label>
+                        <label class="flex items-center space-x-2 bg-white p-2 rounded-xl border border-amber-100 cursor-pointer">
+                            <input type="checkbox" id="chkHba1c" class="risk-checkbox rounded text-amber-600" value="HbA1c ≥ 5.7%" onchange="evaluateBaselineRisk()">
+                            <span>HbA1c ≥ 5.7% (自动联动)</span>
+                        </label>
+                        <label class="flex items-center space-x-2 bg-white p-2 rounded-xl border border-amber-100 cursor-pointer">
+                            <input type="checkbox" id="chkBmi" class="risk-checkbox rounded text-amber-600" value="BMI ≥ 28 kg/m²" onchange="evaluateBaselineRisk()">
+                            <span>BMI ≥ 28 kg/m² (中国肥胖标准)</span>
+                        </label>
+                        <label class="flex items-center space-x-2 bg-white p-2 rounded-xl border border-amber-100 cursor-pointer">
+                            <input type="checkbox" id="chkAge" class="risk-checkbox rounded text-amber-600" value="年龄 > 45 岁" onchange="evaluateBaselineRisk()">
+                            <span>年龄 > 45 岁 (自动联动)</span>
+                        </label>
+                        <label class="flex items-center space-x-2 bg-white p-2 rounded-xl border border-amber-100 cursor-pointer">
+                            <input type="checkbox" class="risk-checkbox rounded text-amber-600" value="糖尿病家族史" onchange="evaluateBaselineRisk()">
+                            <span>一级亲属糖尿病家族史</span>
+                        </label>
+                        <label class="flex items-center space-x-2 bg-white p-2 rounded-xl border border-amber-100 cursor-pointer">
+                            <input type="checkbox" class="risk-checkbox rounded text-amber-600" value="妊娠糖尿病史/心血管/高血压" onchange="evaluateBaselineRisk()">
+                            <span>妊娠糖尿病史 / 心血管病 / 高血压</span>
+                        </label>
+                    </div>
+                    <div id="highRiskTip" class="hidden mt-3 text-[11px] bg-amber-100/90 text-amber-900 p-2.5 rounded-xl border border-amber-300 flex items-start space-x-2">
+                        <i class="fa-solid fa-lightbulb text-amber-600 mt-0.5"></i>
+                        <span><strong>共识建议：</strong>该患者存在高血糖高危因素，建议与主治医生沟通，考虑在<strong>第1周期第1天预防性使用二甲双胍</strong>，并加密空腹血糖监测频率。</span>
+                    </div>
+                </div>
+
+                <!-- 首次患教确认清单 -->
+                <div class="bg-teal-50/60 border border-teal-200/70 rounded-2xl p-4 space-y-2">
+                    <h4 class="text-xs font-bold text-teal-900">首次购药患教与关爱包发放核对</h4>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-slate-700">
+                        <label class="flex items-center space-x-2 cursor-pointer">
+                            <input type="checkbox" id="eduKit" checked class="rounded text-teal-600">
+                            <span>已发放血糖关爱包及患者教育手册</span>
+                        </label>
+                        <label class="flex items-center space-x-2 cursor-pointer">
+                            <input type="checkbox" id="eduMeter" checked class="rounded text-teal-600">
+                            <span>已现场演示指尖血糖仪规范操作</span>
+                        </label>
+                        <label class="flex items-center space-x-2 cursor-pointer">
+                            <input type="checkbox" id="eduTarget" checked class="rounded text-teal-600">
+                            <span>已告知“中靶效应”及警戒线(8.9 / 13.9)</span>
+                        </label>
+                        <label class="flex items-center space-x-2 cursor-pointer">
+                            <input type="checkbox" id="eduMouthwash" class="rounded text-teal-600">
+                            <span>已指导地塞米松漱口水预防口腔炎</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="flex justify-end space-x-3 pt-2">
+                    <button type="button" onclick="closeModal('newPatientModal')" class="px-5 py-2.5 rounded-xl text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200">取消</button>
+                    <button type="submit" class="px-6 py-2.5 rounded-xl text-sm font-semibold text-white bg-teal-700 hover:bg-teal-600 shadow-md">完成建档并生成随访计划</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ==================== 模态框 2：患者详情、血糖曲线与随访录入 ==================== -->
+    <div id="patientDetailModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
+        <div class="bg-white rounded-3xl max-w-4xl w-full max-h-[94vh] overflow-y-auto shadow-2xl border border-slate-100 flex flex-col">
+            <!-- 顶部患者信息头 -->
+            <div id="detailHeader" class="sticky top-0 bg-white/95 backdrop-blur px-5 py-4 border-b border-slate-100 flex items-center justify-between z-20">
+                <!-- 动态渲染 -->
+            </div>
+
+            <div class="p-4 sm:p-6 space-y-6">
+                <!-- 1. 血糖趋势可视化图表 (SVG动态绘制) -->
+                <div class="bg-slate-50 rounded-2xl p-4 border border-slate-200/80">
+                    <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+                        <div>
+                            <h4 class="text-sm font-bold text-slate-800 flex items-center space-x-1.5">
+                                <i class="fa-solid fa-chart-line text-teal-600"></i>
+                                <span>空腹血糖 (FPG) 动态监测趋势图</span>
+                            </h4>
+                            <p class="text-[11px] text-slate-500">绿色虚线：目标上限 8.9 mmol/L | 红色虚线：紧急就医线 13.9 mmol/L</p>
+                        </div>
+                        <div class="flex items-center space-x-3 text-[11px]">
+                            <span class="flex items-center"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500 mr-1"></span>正常(&lt;8.9)</span>
+                            <span class="flex items-center"><span class="w-2.5 h-2.5 rounded-full bg-amber-500 mr-1"></span>2级(8.9-13.9)</span>
+                            <span class="flex items-center"><span class="w-2.5 h-2.5 rounded-full bg-rose-500 mr-1"></span>3级+(&gt;13.9)</span>
+                        </div>
+                    </div>
+                    <div id="glucoseChartContainer" class="w-full h-48 bg-white rounded-xl border border-slate-100 p-2 flex items-center justify-center">
+                        <!-- SVG Chart -->
+                    </div>
+                </div>
+
+                <!-- 2. 新增随访记录表单 (双栏布局：左侧录入，右侧实时SOP决策与话术) -->
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+                    <!-- 左侧录入区 -->
+                    <form id="followupForm" onsubmit="saveFollowupRecord(event)" class="lg:col-span-6 bg-white rounded-2xl p-4 border-2 border-teal-600/20 shadow-sm space-y-4">
+                        <div class="flex items-center justify-between border-b border-slate-100 pb-2.5">
+                            <h4 class="text-sm font-bold text-teal-900 flex items-center space-x-1.5">
+                                <i class="fa-solid fa-pen-to-square text-teal-600"></i>
+                                <span>录入本次随访数据</span>
+                            </h4>
+                            <span id="currentStageTag" class="text-[11px] font-semibold bg-teal-50 text-teal-700 px-2.5 py-0.5 rounded-full">第1周随访期</span>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-700 mb-1">随访日期 *</label>
+                                <input type="date" id="fDate" required class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-700 mb-1">空腹血糖 FPG (mmol/L) *</label>
+                                <input type="number" step="0.1" id="fFpg" required oninput="updateLiveSopDecision()" placeholder="输入数值" class="w-full px-3 py-2 bg-amber-50/40 border border-teal-300 rounded-xl text-sm font-bold text-slate-900 focus:ring-2 focus:ring-teal-500">
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs font-medium text-slate-700 mb-1">HbA1c (%) (选填)</label>
+                                <input type="number" step="0.1" id="fHba1c" placeholder="每3个月复查" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-slate-700 mb-1">当前合并降糖方案</label>
+                                <select id="fAntiDiabetic" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs">
+                                    <option value="暂未用药(生活方式干预)">暂未用药 (饮食+运动)</option>
+                                    <option value="二甲双胍 (1L首选)">二甲双胍 (1L首选)</option>
+                                    <option value="二甲双胍 + SGLT2i">二甲双胍 + SGLT2抑制剂</option>
+                                    <option value="二甲双胍 + DPP-4i/GLP-1">二甲双胍 + DPP-4i/GLP-1</option>
+                                    <option value="内分泌科会诊方案">内分泌科会诊方案</option>
+                                    <option value="短期胰岛素 (末线)">短期胰岛素 (末线)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- 症状与酮症筛查 -->
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1.5">高血糖及酮症(DKA)警戒症状</label>
+                            <div class="flex flex-wrap gap-2 text-xs">
+                                <label class="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg bg-slate-50 border border-slate-200 cursor-pointer">
+                                    <input type="checkbox" id="fSymHyper" onchange="updateLiveSopDecision()" class="rounded text-amber-600">
+                                    <span>口渴/多尿/乏力</span>
+                                </label>
+                                <label class="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 font-medium cursor-pointer">
+                                    <input type="checkbox" id="fSymDka" onchange="updateLiveSopDecision()" class="rounded text-rose-600">
+                                    <span>恶心呕吐/腹痛/呼吸深快(酮症)</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- 其他核心AE快速评估 (口腔炎 / 腹泻 / 皮疹) -->
+                        <div class="bg-slate-50 p-3 rounded-xl border border-slate-200/70 space-y-2">
+                            <label class="block text-xs font-bold text-slate-700">其他核心不良反应 (AE) 同步评估</label>
+                            <div class="grid grid-cols-3 gap-2 text-xs">
+                                <div>
+                                    <span class="text-[11px] text-slate-500 block mb-1">口腔炎</span>
+                                    <select id="fAeStomatitis" class="w-full p-1.5 bg-white border border-slate-200 rounded-lg">
+                                        <option value="0级">无 (0级)</option>
+                                        <option value="1级">1级 (轻微)</option>
+                                        <option value="2级">2级 (中度痛)</option>
+                                        <option value="3级">3级 (重度)</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <span class="text-[11px] text-slate-500 block mb-1">腹泻</span>
+                                    <select id="fAeDiarrhea" class="w-full p-1.5 bg-white border border-slate-200 rounded-lg">
+                                        <option value="0级">无 (0级)</option>
+                                        <option value="1级">1级 (&lt;4次/日)</option>
+                                        <option value="2级">2级 (4-6次/日)</option>
+                                        <option value="3级">3级 (≥7次/日)</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <span class="text-[11px] text-slate-500 block mb-1">皮疹</span>
+                                    <select id="fAeRash" class="w-full p-1.5 bg-white border border-slate-200 rounded-lg">
+                                        <option value="0级">无 (0级)</option>
+                                        <option value="1级">1级 (&lt;10%BSA)</option>
+                                        <option value="2级">2级 (10-30%)</option>
+                                        <option value="3级">3级 (&gt;30%)</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs font-medium text-slate-700 mb-1">伊那利塞当前剂量状态</label>
+                                <select id="fInavoStatus" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs">
+                                    <option value="9mg QD 正常服药">9mg QD 正常服药</option>
+                                    <option value="6mg QD 减量服药">6mg QD 减量服药</option>
+                                    <option value="3mg QD 减量服药">3mg QD 减量服药</option>
+                                    <option value="暂停用药 (等待血糖≤8.9)">暂停用药 (等待血糖≤8.9)</option>
+                                    <option value="永久停药">永久停药</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-slate-700 mb-1">下次计划随访日期</label>
+                                <input type="date" id="fNextDate" required class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs">
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-medium text-slate-700 mb-1">随访沟通备注</label>
+                            <input type="text" id="fNotes" placeholder="记录饮食运动执行情况、主治医生反馈等..." class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs">
+                        </div>
+
+                        <button type="submit" class="w-full py-2.5 bg-teal-700 hover:bg-teal-600 text-white font-semibold text-sm rounded-xl shadow-md transition flex items-center justify-center space-x-2">
+                            <i class="fa-solid fa-check-circle"></i>
+                            <span>保存随访记录并更新档案</span>
+                        </button>
+                    </form>
+
+                    <!-- 右侧：智能SOP决策矩阵与一键复制话术 -->
+                    <div class="lg:col-span-6 flex flex-col justify-between space-y-4">
+                        <div id="liveDecisionBox" class="rounded-2xl p-4 bg-slate-50 border border-slate-200 flex-1 flex flex-col justify-center">
+                            <div class="text-center text-slate-400 text-xs py-8">
+                                <i class="fa-solid fa-robot text-2xl mb-2 text-slate-300 block"></i>
+                                输入左侧空腹血糖（FPG）后，系统将自动匹配<br><strong>SOP决策矩阵、剂量调整规则及患教沟通话术</strong>
+                            </div>
+                        </div>
+
+                        <!-- 饮食与运动快查卡 -->
+                        <div class="bg-emerald-50/80 border border-emerald-200/80 rounded-2xl p-3.5 text-xs">
+                            <div class="font-bold text-emerald-900 mb-1.5 flex items-center justify-between">
+                                <span>🥗 药师患教饮食+运动快查卡</span>
+                                <button type="button" onclick="copyText('【伊赫莱血糖饮食运动建议】1.主食：全谷物/燕麦/藜麦≥1/3，忌白米馒头含糖饮料；2.蔬菜：≥500g/天，深色过半；3.蛋白质：鱼虾/禽肉/豆类优先；4.水果：低GI为主不榨汁；5.运动：餐后30分钟开始中等强度散步30-45分钟。')" class="text-[11px] bg-emerald-600 text-white px-2 py-0.5 rounded-lg hover:bg-emerald-500">复制发患教</button>
+                            </div>
+                            <div class="grid grid-cols-2 gap-1.5 text-[11px] text-emerald-800">
+                                <div>• <strong>主食：</strong>全谷物/燕麦/藜麦 ≥1/3</div>
+                                <div>• <strong>蔬菜：</strong>≥500g/天，深色蔬菜过半</div>
+                                <div>• <strong>运动：</strong>餐后30min散步 30-45min</div>
+                                <div>• <strong>忌食：</strong>白米/馒头/精制糖/含糖饮料</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. 历史随访记录时间轴 -->
+                <div>
+                    <h4 class="text-sm font-bold text-slate-800 mb-3 flex items-center space-x-1.5">
+                        <i class="fa-solid fa-clock-rotate-left text-teal-600"></i>
+                        <span>历史随访与血糖处置档案</span>
+                    </h4>
+                    <div id="followupHistoryList" class="space-y-2.5">
+                        <!-- 动态渲染历史记录 -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== 模态框 3：SOP标准化处置流程图速查 ==================== -->
+    <div id="sopModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+        <div class="bg-white rounded-3xl max-w-3xl w-full max-h-[90vh] overflow-y-auto shadow-2xl p-6 space-y-5">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div>
+                    <h3 class="font-bold text-lg text-slate-800">伊那利塞血糖随访标准化处置规范 (药师SOP版)</h3>
+                    <p class="text-xs text-slate-500">依据《乳腺癌PAM通路抑制剂不良反应管理专家共识（2026版）》</p>
+                </div>
+                <button onclick="closeModal('sopModal')" class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <div class="space-y-4 text-xs">
+                <div class="bg-teal-50 p-4 rounded-2xl border border-teal-200">
+                    <h4 class="font-bold text-teal-900 text-sm mb-2">📅 1. 标准化血糖监测时间表</h4>
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
+                        <div class="bg-white p-2.5 rounded-xl border border-teal-100">
+                            <div class="font-bold text-teal-700">第1周 (D1-7)</div>
+                            <div class="text-slate-600 mt-1">每 3 天监测1次</div>
+                        </div>
+                        <div class="bg-white p-2.5 rounded-xl border border-teal-100">
+                            <div class="font-bold text-teal-700">第2-4周 (D8-28)</div>
+                            <div class="text-slate-600 mt-1">每周监测 1 次</div>
+                        </div>
+                        <div class="bg-white p-2.5 rounded-xl border border-teal-100">
+                            <div class="font-bold text-teal-700">第2-3月 (M2-3)</div>
+                            <div class="text-slate-600 mt-1">每 2 周监测1次</div>
+                        </div>
+                        <div class="bg-white p-2.5 rounded-xl border border-teal-100">
+                            <div class="font-bold text-teal-700">第4月起 (M4+)</div>
+                            <div class="text-slate-600 mt-1">每 28 天监测1次</div>
+                        </div>
+                    </div>
+                    <p class="text-[11px] text-teal-800 mt-2">* 注：若出现Grade 2级高血糖（8.9-13.9 mmol/L），需加密随访至每2-3天1次；HbA1c每3个月监测1次。</p>
+                </div>
+
+                <div class="space-y-2.5">
+                    <h4 class="font-bold text-slate-800 text-sm">🎯 2. 血糖分级决策与伊那利塞剂量调整原则 (9mg → 6mg → 3mg)</h4>
+                    <div class="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200">
+                        <div class="font-bold text-emerald-900">✅ Grade 1 / 正常达标：FPG ≤ 8.9 mmol/L</div>
+                        <p class="text-emerald-800 mt-1">无需调整伊那利塞剂量。继续饮食运动干预，按原定周期随访。有高危因素者可考虑启动/强化二甲双胍。</p>
+                    </div>
+                    <div class="p-3.5 rounded-2xl bg-amber-50 border border-amber-200">
+                        <div class="font-bold text-amber-900">⚠️ Grade 2 / 中度升高：8.9 &lt; FPG ≤ 13.9 mmol/L</div>
+                        <p class="text-amber-800 mt-1"><strong>暂停伊那利塞</strong>直至 FPG ≤ 8.9 mmol/L；启动/强化口服降糖药（<strong>首选二甲双胍</strong>，不推荐优先使用胰岛素）；恢复至≤8.9后<strong>同剂量继续</strong>。若持续7天 &gt;11.1-13.9 mmol/L，建议咨询内分泌专科。</p>
+                    </div>
+                    <div class="p-3.5 rounded-2xl bg-rose-50 border border-rose-200">
+                        <div class="font-bold text-rose-900">🚨 Grade 3 / 严重升高：13.9 &lt; FPG ≤ 27.8 mmol/L</div>
+                        <p class="text-rose-800 mt-1"><strong>立即暂停伊那利塞</strong>，排查酮症，当日联系主治医生/内分泌会诊并强化降糖。若<strong>≤7天内降至≤8.9</strong>，可同剂量恢复；若<strong>&gt;7天恢复</strong>或<strong>30天内再次≥3级</strong>，恢复时<strong>降低一个剂量水平</strong>（9→6mg 或 6→3mg）。</p>
+                    </div>
+                    <div class="p-3.5 rounded-2xl bg-red-100 border border-red-300">
+                        <div class="font-bold text-red-950">🆘 Grade 4 / 危及生命：FPG &gt; 27.8 mmol/L 或出现 DKA</div>
+                        <p class="text-red-900 mt-1"><strong>立即急诊就医并暂停伊那利塞</strong>，评估血容量不足与酮症并补液。降至≤8.9后<strong>降低一个剂量水平</strong>；若<strong>30天内再次≥4级，永久停药</strong>。</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 全局轻量 Toast 提示框 -->
+    <div id="toast" class="fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-900/95 text-white text-xs font-medium px-4 py-2.5 rounded-full shadow-xl z-50 transition-all duration-300 opacity-0 pointer-events-none flex items-center space-x-2">
+        <i class="fa-solid fa-circle-check text-emerald-400"></i>
+        <span id="toastMsg">操作成功</span>
+    </div>
+
+    <script>
+        // ==================== 核心数据状态与预置临床演示病例 ====================
+        const STORAGE_KEY = 'inavolisib_pharmacist_patients_v1';
+
+        // 格式化相对日期辅助函数
+        function getDateOffset(daysOffset) {
+            const d = new Date();
+            d.setDate(d.getDate() + daysOffset);
+            return d.toISOString().split('T')[0];
+        }
+
+        // 预置3位典型临床随访患者（涵盖正常达标、Grade 2干预加密、Grade 3紧急处理恢复案例）
+        const defaultPatients = [
+            {
+                id: 'PT-2026001',
+                name: '林婉清',
+                age: 54,
+                phone: '138-0192-4410',
+                startDate: getDateOffset(-10),
+                dose: '9mg QD',
+                doctor: '陈教授 (乳腺肿瘤内科)',
+                baseFpg: 5.8,
+                baseHba1c: 6.1,
+                bmi: 28.4,
+                riskFactors: ['年龄 > 45 岁', 'HbA1c ≥ 5.7%', 'BMI ≥ 28 kg/m²'],
+                riskLevel: 'HIGH',
+                eduChecklist: { kit: true, meter: true, target: true, mouthwash: true },
+                records: [
+                    {
+                        id: 'REC-101',
+                        date: getDateOffset(-10),
+                        fpg: 5.8,
+                        hba1c: 6.1,
+                        antiDiabetic: '二甲双胍 (1L首选)',
+                        symHyper: false,
+                        symDka: false,
+                        ae: { stomatitis: '0级', diarrhea: '0级', rash: '0级' },
+                        inavoStatus: '9mg QD 正常服药',
+                        nextDate: getDateOffset(-7),
+                        notes: '高危基线患者，主治医生第1周期第1天预防性启用二甲双胍500mg BID。'
+                    },
+                    {
+                        id: 'REC-102',
+                        date: getDateOffset(-7),
+                        fpg: 7.4,
+                        hba1c: null,
+                        antiDiabetic: '二甲双胍 (1L首选)',
+                        symHyper: false,
+                        symDka: false,
+                        ae: { stomatitis: '1级', diarrhea: '0级', rash: '0级' },
+                        inavoStatus: '9mg QD 正常服药',
+                        nextDate: getDateOffset(-3),
+                        notes: 'D3随访FPG轻度升至7.4（<8.9），属在靶效应，指导继续低碳水饮食及地塞米松漱口水。'
+                    },
+                    {
+                        id: 'REC-103',
+                        date: getDateOffset(-3),
+                        fpg: 10.6,
+                        hba1c: null,
+                        antiDiabetic: '二甲双胍 + SGLT2i',
+                        symHyper: true,
+                        symDka: false,
+                        ae: { stomatitis: '1级', diarrhea: '0级', rash: '0级' },
+                        inavoStatus: '暂停用药 (等待血糖≤8.9)',
+                        nextDate: getDateOffset(0),
+                        notes: 'D7出现Grade 2高血糖(10.6)，微感口渴，无酮症。已通知陈教授，暂停伊那利塞并加用达格列净，今日需加密随访！'
+                    }
+                ]
+            },
+            {
+                id: 'PT-2026002',
+                name: '周美珍',
+                age: 43,
+                phone: '139-5521-8932',
+                startDate: getDateOffset(-21),
+                dose: '9mg QD',
+                doctor: '张主任 (乳腺外科)',
+                baseFpg: 5.1,
+                baseHba1c: 5.4,
+                bmi: 22.1,
+                riskFactors: [],
+                riskLevel: 'LOW',
+                eduChecklist: { kit: true, meter: true, target: true, mouthwash: false },
+                records: [
+                    {
+                        id: 'REC-201',
+                        date: getDateOffset(-21),
+                        fpg: 5.1,
+                        hba1c: 5.4,
+                        antiDiabetic: '暂未用药(生活方式干预)',
+                        symHyper: false,
+                        symDka: false,
+                        ae: { stomatitis: '0级', diarrhea: '0级', rash: '0级' },
+                        inavoStatus: '9mg QD 正常服药',
+                        nextDate: getDateOffset(-14),
+                        notes: '低危基线患者，完成血糖仪操作演示，嘱第1周每3天监测空腹血糖。'
+                    },
+                    {
+                        id: 'REC-202',
+                        date: getDateOffset(-14),
+                        fpg: 6.2,
+                        hba1c: null,
+                        antiDiabetic: '暂未用药(生活方式干预)',
+                        symHyper: false,
+                        symDka: false,
+                        ae: { stomatitis: '0级', diarrhea: '1级', rash: '0级' },
+                        inavoStatus: '9mg QD 正常服药',
+                        nextDate: getDateOffset(-7),
+                        notes: '血糖控制平稳，偶有稀便2次/日（1级），已指导补充电解质并备洛哌丁胺。'
+                    },
+                    {
+                        id: 'REC-203',
+                        date: getDateOffset(-7),
+                        fpg: 6.5,
+                        hba1c: null,
+                        antiDiabetic: '暂未用药(生活方式干预)',
+                        symHyper: false,
+                        symDka: false,
+                        ae: { stomatitis: '0级', diarrhea: '0级', rash: '0级' },
+                        inavoStatus: '9mg QD 正常服药',
+                        nextDate: getDateOffset(0),
+                        notes: '进入第3周，血糖持续达标（<8.9），正向鼓励患者保持节奏。'
+                    }
+                ]
+            },
+            {
+                id: 'PT-2026003',
+                name: '赵淑芬',
+                age: 62,
+                phone: '136-8840-1209',
+                startDate: getDateOffset(-38),
+                dose: '6mg QD',
+                doctor: '王教授 (肿瘤内科)',
+                baseFpg: 6.4,
+                baseHba1c: 6.3,
+                bmi: 25.8,
+                riskFactors: ['年龄 > 45 岁', 'HbA1c ≥ 5.7%', '糖尿病家族史'],
+                riskLevel: 'HIGH',
+                eduChecklist: { kit: true, meter: true, target: true, mouthwash: true },
+                records: [
+                    {
+                        id: 'REC-301',
+                        date: getDateOffset(-38),
+                        fpg: 6.4,
+                        hba1c: 6.3,
+                        antiDiabetic: '二甲双胍 (1L首选)',
+                        symHyper: false,
+                        symDka: false,
+                        ae: { stomatitis: '0级', diarrhea: '0级', rash: '0级' },
+                        inavoStatus: '9mg QD 正常服药',
+                        nextDate: getDateOffset(-31),
+                        notes: '合并糖尿病前期及家族史，起始预防性二甲双胍。'
+                    },
+                    {
+                        id: 'REC-302',
+                        date: getDateOffset(-28),
+                        fpg: 14.8,
+                        hba1c: null,
+                        antiDiabetic: '二甲双胍 + DPP-4i/GLP-1',
+                        symHyper: true,
+                        symDka: false,
+                        ae: { stomatitis: '1级', diarrhea: '0级', rash: '1级' },
+                        inavoStatus: '暂停用药 (等待血糖≤8.9)',
+                        nextDate: getDateOffset(-25),
+                        notes: '发生Grade 3高血糖(14.8)，紧急通知王教授暂停伊那利塞，排除酮症后联合西格列汀强化降糖。'
+                    },
+                    {
+                        id: 'REC-303',
+                        date: getDateOffset(-19),
+                        fpg: 7.9,
+                        hba1c: null,
+                        antiDiabetic: '二甲双胍 + DPP-4i/GLP-1',
+                        symHyper: false,
+                        symDka: false,
+                        ae: { stomatitis: '0级', diarrhea: '0级', rash: '0级' },
+                        inavoStatus: '6mg QD 减量服药',
+                        nextDate: getDateOffset(-5),
+                        notes: '暂停9天后血糖降至7.9（≤8.9），按共识降低一个剂量水平至6mg QD恢复治疗，耐受良好。'
+                    }
+                ]
+            }
+        ];
+
+        let patients = [];
+        let currentRiskFilter = 'ALL';
+        let activePatientId = null;
+
+        // 初始化加载数据
+        function initApp() {
+            try {
+                const saved = localStorage.getItem(STORAGE_KEY);
+                if (saved) {
+                    patients = JSON.parse(saved);
+                } else {
+                    patients = defaultPatients;
+                    saveToStorage();
+                }
+            } catch (e) {
+                patients = defaultPatients;
+            }
+            renderAll();
+        }
+
+        function saveToStorage() {
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(patients));
+            } catch (e) {
+                console.warn('Storage unavailable, using in-memory state');
+            }
+        }
+
+        // ==================== 核心临床决策算法 (SOP & 2026专家共识) ====================
+        function evaluateGlucoseDecision(fpg, symHyper = false, symDka = false) {
+            const val = parseFloat(fpg);
+            if (isNaN(val) || val <= 0) return null;
+
+            // 紧急酮症警示 (包括SGLT2i相关的正常血糖性DKA euDKA)
+            if (symDka) {
+                return {
+                    grade: '紧急酮症预警 (DKA/euDKA风险)',
+                    level: 4,
+                    badgeClass: 'bg-red-600 text-white animate-pulse',
+                    cardClass: 'bg-red-50 border-red-300 text-red-950',
+                    actionTitle: '🆘 立即拨打120 / 急诊就医，即刻暂停伊那利塞！',
+                    doseRule: '必须立即暂停伊那利塞，急查血酮（β-羟丁酸）及动脉血气，补液纠正酮症。',
+                    followFreq: '急诊处置后24小时内强制跟进',
+                    patientScript: '“您目前出现的恶心呕吐、腹痛或呼吸深快可能是酮症酸中毒的信号，无论血糖多高都必须立刻去急诊或拨打120，今天先暂停服用伊那利塞！”',
+                    doctorScript: '【紧急会诊】患者出现疑似酮症症状（恶心/腹痛/呼吸深快），当前FPG ' + val + ' mmol/L，已嘱立即暂停伊那利塞并前往急诊排查DKA/euDKA，请指示后续处理。'
+                };
+            }
+
+            if (val <= 8.9) {
+                return {
+                    grade: 'Grade 1 / 正常达标',
+                    level: 1,
+                    badgeClass: 'bg-emerald-100 text-emerald-800 border border-emerald-200',
+                    cardClass: 'bg-emerald-50/80 border-emerald-200 text-emerald-950',
+                    actionTitle: '✅ 无需调整伊那利塞剂量，按原方案继续',
+                    doseRule: '维持当前伊那利塞剂量；继续饮食+餐后运动干预；高危患者维持预防性二甲双胍。',
+                    followFreq: '按当前治疗周期常规随访 (W1每3天 / W2-4每周 / M2-3每2周 / M4+每28天)',
+                    patientScript: '“您的空腹血糖控制得非常理想（≤8.9 mmol/L）！说明您的饮食配合很到位，请继续保持这个节奏，不要自行减量或停药，按约定时间再测血糖告诉我。”',
+                    doctorScript: '患者FPG ' + val + ' mmol/L，处于安全目标范围内（≤8.9），无需调整伊那利塞剂量，常规随访中。'
+                };
+            } else if (val > 8.9 && val <= 13.9) {
+                return {
+                    grade: 'Grade 2 / 中度升高',
+                    level: 2,
+                    badgeClass: 'bg-amber-100 text-amber-800 border border-amber-300',
+                    cardClass: 'bg-amber-50 border-amber-300 text-amber-950',
+                    actionTitle: '⚠️ 暂停伊那利塞直至FPG ≤ 8.9，联系医生启用/强化降糖药',
+                    doseRule: '共识建议：暂停伊那利塞直至FPG ≤ 8.9 mmol/L后同剂量恢复；首选二甲双胍（1L）或联合SGLT2i/DPP-4i（不首选胰岛素）；若持续7天 >11.1-13.9，咨询内分泌科。',
+                    followFreq: '加密随访至每 2 - 3 天 1 次',
+                    patientScript: '“血糖偏高（' + val + ' mmol/L）是伊那利塞靶向起效的常见表现，先别慌，但需要及时干预。饮食上主食立刻换成燕麦/全谷物，餐后散步30分钟。今天我帮您联系主治医生评估用降糖药及暂时停药几天，在医生指示前请勿自行永久停药。”',
+                    doctorScript: '【药师随访提醒】患者当前FPG ' + val + ' mmol/L，达Grade 2高血糖' + (symHyper ? '（伴有口渴/多尿症状）' : '（无明显不适）') + '。已指导饮食控制并加密随访，建议暂停伊那利塞至FPG≤8.9，请评估启用/强化降糖药物（首选二甲双胍）。'
+                };
+            } else if (val > 13.9 && val <= 27.8) {
+                return {
+                    grade: 'Grade 3 / 严重升高',
+                    level: 3,
+                    badgeClass: 'bg-rose-100 text-rose-800 border border-rose-300',
+                    cardClass: 'bg-rose-50 border-rose-300 text-rose-950',
+                    actionTitle: '🚨 今日必须就医！立即暂停伊那利塞并电话通知主治医生',
+                    doseRule: '立即暂停伊那利塞，排除酮症并强化降糖。若≤7天内降至≤8.9，可同剂量恢复；若>7天恢复或30天内再次≥3级，恢复时需降低一个剂量水平（9→6mg 或 6→3mg）。',
+                    followFreq: '每日跟踪，就医后 24 小时内必须跟进处置结果',
+                    patientScript: '“您今天的空腹血糖升高幅度较大（' + val + ' mmol/L），今天必须联系主治医生就诊，先暂停服用伊那利塞！如果您感到恶心呕吐、腹痛或呼吸困难，请立刻去急诊，不要等待！”',
+                    doctorScript: '【紧急随访上报】患者当前FPG ' + val + ' mmol/L，达Grade 3严重高血糖（无明显酮症急性表现），已嘱患者暂停伊那利塞并今日内就诊，请指示降糖强化方案及后续剂量调整（7天内恢复同剂量，>7天需减量）。'
+                };
+            } else {
+                return {
+                    grade: 'Grade 4 / 危及生命',
+                    level: 4,
+                    badgeClass: 'bg-red-600 text-white',
+                    cardClass: 'bg-red-50 border-red-400 text-red-950',
+                    actionTitle: '🆘 代谢急症！立即急诊就医并永久/暂停伊那利塞',
+                    doseRule: '立即暂停伊那利塞，急诊评估容量不足和酮症并补液，内分泌科紧急会诊。降至≤8.9后降低一个剂量水平；若30天内再次≥4级，永久停药。',
+                    followFreq: '急诊处置后 24 小时内跟踪',
+                    patientScript: '“您的血糖已超过27.8 mmol/L，属于代谢紧急情况，请立即停止服用伊那利塞，家属立刻陪同前往医院急诊科处理！”',
+                    doctorScript: '【危急值上报】患者FPG ' + val + ' mmol/L（>27.8），Grade 4高血糖，已嘱立即停药并送急诊排查DKA/HHS，请内分泌科紧急会诊。'
+                };
+            }
+        }
+
+        // 计算患者当前所处治疗天数及SOP随访阶段
+        function getPatientStageInfo(startDateStr) {
+            const start = new Date(startDateStr);
+            const now = new Date();
+            const diffDays = Math.max(1, Math.floor((now - start) / (1000 * 60 * 60 * 24)) + 1);
+
+            if (diffDays <= 7) {
+                return { days: diffDays, stage: '第1周 (D1-7)', freq: '每3天1次', recommendedNextDays: 3 };
+            } else if (diffDays <= 28) {
+                return { days: diffDays, stage: '第2-4周 (D8-28)', freq: '每周1次', recommendedNextDays: 7 };
+            } else if (diffDays <= 90) {
+                return { days: diffDays, stage: '第2-3月 (M2-M3)', freq: '每2周1次', recommendedNextDays: 14 };
+            } else {
+                return { days: diffDays, stage: '第4月起 (M4+)', freq: '每28天1次', recommendedNextDays: 28 };
+            }
+        }
+
+        // ==================== 界面渲染函数 ====================
+        function renderAll() {
+            renderDashboardStats();
+            renderPatientList();
+            renderTodoList();
+        }
+
+        function renderDashboardStats() {
+            const total = patients.length;
+            let alertCount = 0;
+            let highRiskCount = 0;
+            let dueTodayCount = 0;
+            const todayStr = getDateOffset(0);
+
+            patients.forEach(p => {
+                if (p.riskLevel === 'HIGH') highRiskCount++;
+                const latest = p.records[p.records.length - 1];
+                if (latest && latest.fpg > 8.9) alertCount++;
+                if (latest && latest.nextDate <= todayStr) dueTodayCount++;
+            });
+
+            document.getElementById('todoBadge').innerText = dueTodayCount;
+
+            document.getElementById('dashboardStats').innerHTML = `
+                <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200/70 flex items-center justify-between">
+                    <div>
+                        <p class="text-xs text-slate-500 font-medium">在管伊赫莱患者</p>
+                        <p class="text-2xl font-bold text-slate-800 mt-1">${total} <span class="text-xs font-normal text-slate-400">人</span></p>
+                    </div>
+                    <div class="w-10 h-10 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center text-lg">
+                        <i class="fa-solid fa-hospital-user"></i>
+                    </div>
+                </div>
+                <div class="bg-white p-4 rounded-2xl shadow-sm border border-rose-200/80 flex items-center justify-between cursor-pointer hover:bg-rose-50/30 transition" onclick="setRiskFilter('ALERT'); switchMainTab('patients');">
+                    <div>
+                        <p class="text-xs text-rose-600 font-semibold">血糖超标警戒 (&gt;8.9)</p>
+                        <p class="text-2xl font-bold text-rose-600 mt-1">${alertCount} <span class="text-xs font-normal text-rose-400">人需干预</span></p>
+                    </div>
+                    <div class="w-10 h-10 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center text-lg">
+                        <i class="fa-solid fa-triangle-exclamation"></i>
+                    </div>
+                </div>
+                <div class="bg-white p-4 rounded-2xl shadow-sm border border-amber-200/80 flex items-center justify-between cursor-pointer hover:bg-amber-50/30 transition" onclick="setRiskFilter('HIGH'); switchMainTab('patients');">
+                    <div>
+                        <p class="text-xs text-amber-700 font-medium">基线高危患者</p>
+                        <p class="text-2xl font-bold text-amber-700 mt-1">${highRiskCount} <span class="text-xs font-normal text-amber-500">人重点监测</span></p>
+                    </div>
+                    <div class="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center text-lg">
+                        <i class="fa-solid fa-shield-halved"></i>
+                    </div>
+                </div>
+                <div class="bg-white p-4 rounded-2xl shadow-sm border border-cyan-200/80 flex items-center justify-between cursor-pointer hover:bg-cyan-50/30 transition" onclick="switchMainTab('todos')">
+                    <div>
+                        <p class="text-xs text-cyan-800 font-medium">今日/逾期随访</p>
+                        <p class="text-2xl font-bold text-cyan-700 mt-1">${dueTodayCount} <span class="text-xs font-normal text-cyan-500">人待联系</span></p>
+                    </div>
+                    <div class="w-10 h-10 rounded-xl bg-cyan-100 text-cyan-700 flex items-center justify-center text-lg">
+                        <i class="fa-solid fa-phone-volume"></i>
+                    </div>
+                </div>
+            `;
+        }
+
+        function setRiskFilter(filter) {
+            currentRiskFilter = filter;
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                if (btn.dataset.filter === filter) {
+                    btn.className = 'filter-btn active px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-800 text-white whitespace-nowrap';
+                } else {
+                    btn.className = 'filter-btn px-3.5 py-2 rounded-xl text-xs font-semibold bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 whitespace-nowrap';
+                }
+            });
+            renderPatientList();
+        }
+
+        function renderPatientList() {
+            const keyword = document.getElementById('searchInput').value.trim().toLowerCase();
+            const container = document.getElementById('patientListContainer');
+            const todayStr = getDateOffset(0);
+
+            const filtered = patients.filter(p => {
+                const latest = p.records[p.records.length - 1];
+                const matchKeyword = p.name.toLowerCase().includes(keyword) || 
+                                     p.id.toLowerCase().includes(keyword) || 
+                                     p.phone.includes(keyword) ||
+                                     (p.doctor && p.doctor.toLowerCase().includes(keyword));
+                if (!matchKeyword) return false;
+
+                if (currentRiskFilter === 'ALERT') return latest && latest.fpg > 8.9;
+                if (currentRiskFilter === 'HIGH') return p.riskLevel === 'HIGH';
+                return true;
+            });
+
+            if (filtered.length === 0) {
+                container.innerHTML = `
+                    <div class="col-span-full bg-white rounded-2xl p-10 text-center border border-slate-200/80">
+                        <i class="fa-solid fa-folder-open text-3xl text-slate-300 mb-2"></i>
+                        <p class="text-sm text-slate-500">未找到符合条件的患者档案</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = filtered.map(p => {
+                const latest = p.records[p.records.length - 1];
+                const stageInfo = getPatientStageInfo(p.startDate);
+                const decision = latest ? evaluateGlucoseDecision(latest.fpg, latest.symHyper, latest.symDka) : null;
+                const isDue = latest && latest.nextDate <= todayStr;
+
+                // 血糖状态色彩
+                let fpgColor = 'text-emerald-600';
+                let borderAccent = 'border-slate-200/90';
+                if (latest.fpg > 13.9) {
+                    fpgColor = 'text-rose-600';
+                    borderAccent = 'border-rose-300 ring-1 ring-rose-200';
+                } else if (latest.fpg > 8.9) {
+                    fpgColor = 'text-amber-600';
+                    borderAccent = 'border-amber-300 ring-1 ring-amber-200';
+                }
+
+                return `
+                    <div onclick="openPatientDetail('${p.id}')" class="bg-white rounded-2xl p-4 sm:p-5 shadow-sm border ${borderAccent} hover:shadow-md transition cursor-pointer flex flex-col justify-between space-y-3.5">
+                        <div class="flex items-start justify-between">
+                            <div class="flex items-center space-x-3">
+                                <div class="w-11 h-11 rounded-2xl ${p.riskLevel === 'HIGH' ? 'bg-amber-100 text-amber-800' : 'bg-teal-100 text-teal-800'} font-bold text-base flex items-center justify-center shrink-0">
+                                    ${p.name.slice(0, 1)}
+                                </div>
+                                <div>
+                                    <div class="flex items-center space-x-2">
+                                        <h3 class="font-bold text-base text-slate-800">${p.name}</h3>
+                                        <span class="text-xs text-slate-400">${p.age}岁</span>
+                                        ${p.riskLevel === 'HIGH' 
+                                            ? '<span class="text-[10px] font-semibold bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full">高危基线</span>' 
+                                            : '<span class="text-[10px] font-medium bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">低危基线</span>'}
+                                    </div>
+                                    <p class="text-xs text-slate-500 mt-0.5">${p.doctor || '未填医生'} · 用药第 <strong class="text-slate-700">${stageInfo.days}</strong> 天 (${stageInfo.stage})</p>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <span class="text-[10px] text-slate-400 block">最新空腹血糖</span>
+                                <span class="text-xl font-extrabold ${fpgColor}">${latest.fpg.toFixed(1)}</span>
+                                <span class="text-[10px] text-slate-400">mmol/L</span>
+                            </div>
+                        </div>
+
+                        <!-- 状态标签栏 -->
+                        <div class="flex flex-wrap items-center gap-1.5 text-[11px]">
+                            <span class="px-2.5 py-0.5 rounded-lg font-semibold ${decision ? decision.badgeClass : ''}">
+                                ${decision ? decision.grade : ''}
+                            </span>
+                            <span class="px-2 py-0.5 rounded-lg bg-slate-100 text-slate-700 font-medium">
+                                <i class="fa-solid fa-pills text-teal-600 mr-1"></i>${latest.inavoStatus}
+                            </span>
+                            <span class="px-2 py-0.5 rounded-lg bg-blue-50 text-blue-700">
+                                ${latest.antiDiabetic}
+                            </span>
+                        </div>
+
+                        <!-- 底部随访提醒与快捷入口 -->
+                        <div class="pt-2.5 border-t border-slate-100 flex items-center justify-between text-xs">
+                            <div class="${isDue ? 'text-rose-600 font-semibold' : 'text-slate-500'}">
+                                <i class="fa-regular fa-calendar-check mr-1"></i>
+                                下次随访：${latest.nextDate} ${isDue ? '(今日到期/需跟进)' : ''}
+                            </div>
+                            <span class="text-teal-700 font-semibold flex items-center space-x-1">
+                                <span>录入随访</span>
+                                <i class="fa-solid fa-chevron-right text-[10px]"></i>
+                            </span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderTodoList() {
+            const container = document.getElementById('todoListContainer');
+            const todayStr = getDateOffset(0);
+
+            const sorted = [...patients].sort((a, b) => {
+                const dateA = a.records[a.records.length - 1].nextDate;
+                const dateB = b.records[b.records.length - 1].nextDate;
+                return dateA.localeCompare(dateB);
+            });
+
+            container.innerHTML = sorted.map(p => {
+                const latest = p.records[p.records.length - 1];
+                const stageInfo = getPatientStageInfo(p.startDate);
+                const isDue = latest.nextDate <= todayStr;
+                const isAlert = latest.fpg > 8.9;
+
+                return `
+                    <div onclick="openPatientDetail('${p.id}')" class="p-4 rounded-2xl border ${isDue ? 'bg-rose-50/40 border-rose-200' : 'bg-slate-50/60 border-slate-200'} flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer hover:shadow-sm transition">
+                        <div class="flex items-start sm:items-center space-x-3">
+                            <div class="w-10 h-10 rounded-xl ${isDue ? 'bg-rose-100 text-rose-700' : 'bg-teal-100 text-teal-700'} font-bold flex items-center justify-center shrink-0">
+                                ${isDue ? '<i class="fa-solid fa-bell"></i>' : '<i class="fa-regular fa-clock"></i>'}
+                            </div>
+                            <div>
+                                <div class="flex items-center space-x-2">
+                                    <span class="font-bold text-sm text-slate-800">${p.name}</span>
+                                    <span class="text-xs text-slate-500">${p.phone}</span>
+                                    ${isDue ? '<span class="text-[10px] bg-rose-600 text-white px-2 py-0.5 rounded-full font-semibold">今日待随访</span>' : ''}
+                                    ${isAlert ? '<span class="text-[10px] bg-amber-500 text-white px-2 py-0.5 rounded-full font-semibold">血糖超标加密随访</span>' : ''}
+                                </div>
+                                <p class="text-xs text-slate-600 mt-1">
+                                    当前阶段：<strong>${stageInfo.stage}</strong>（标准频次：${stageInfo.freq}） · 上次FPG：<strong class="${isAlert ? 'text-rose-600' : 'text-emerald-700'}">${latest.fpg} mmol/L</strong>
+                                </p>
+                            </div>
+                        </div>
+                        <div class="flex items-center justify-between sm:justify-end space-x-3 border-t sm:border-t-0 pt-2 sm:pt-0 border-slate-200/60">
+                            <div class="text-left sm:text-right">
+                                <span class="text-[10px] text-slate-400 block">计划随访日</span>
+                                <span class="text-xs font-bold ${isDue ? 'text-rose-600' : 'text-slate-700'}">${latest.nextDate}</span>
+                            </div>
+                            <button class="px-3.5 py-2 bg-teal-700 text-white text-xs font-semibold rounded-xl shadow-sm hover:bg-teal-600">
+                                立即记录
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // ==================== 患者详情与随访录入逻辑 ====================
+        function openPatientDetail(patientId) {
+            activePatientId = patientId;
+            const p = patients.find(item => item.id === patientId);
+            if (!p) return;
+
+            const stageInfo = getPatientStageInfo(p.startDate);
+            const latest = p.records[p.records.length - 1];
+
+            // 渲染头部信息
+            document.getElementById('detailHeader').innerHTML = `
+                <div class="flex items-center space-x-3">
+                    <div class="w-11 h-11 rounded-2xl bg-teal-700 text-white font-bold text-lg flex items-center justify-center">
+                        ${p.name.slice(0, 1)}
+                    </div>
+                    <div>
+                        <div class="flex items-center space-x-2">
+                            <h3 class="font-bold text-lg text-slate-800">${p.name}</h3>
+                            <span class="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md">${p.age}岁 · ${p.phone}</span>
+                            <span class="text-xs font-semibold px-2 py-0.5 rounded-md ${p.riskLevel === 'HIGH' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}">
+                                ${p.riskLevel === 'HIGH' ? '高危基线' : '低危基线'}
+                            </span>
+                        </div>
+                        <p class="text-xs text-slate-500 mt-0.5">
+                            基线 FPG: <strong>${p.baseFpg}</strong> | 基线 HbA1c: <strong>${p.baseHba1c}%</strong> | 用药第 <strong>${stageInfo.days}</strong> 天 (${stageInfo.stage})
+                        </p>
+                    </div>
+                </div>
+                <button onclick="closeModal('patientDetailModal')" class="w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            `;
+
+            // 初始化表单默认值
+            document.getElementById('currentStageTag').innerText = `${stageInfo.stage} · ${stageInfo.freq}`;
+            document.getElementById('fDate').value = getDateOffset(0);
+            document.getElementById('fFpg').value = '';
+            document.getElementById('fHba1c').value = '';
+            document.getElementById('fAntiDiabetic').value = latest ? latest.antiDiabetic : '暂未用药(生活方式干预)';
+            document.getElementById('fInavoStatus').value = latest ? latest.inavoStatus : '9mg QD 正常服药';
+            document.getElementById('fSymHyper').checked = false;
+            document.getElementById('fSymDka').checked = false;
+            document.getElementById('fAeStomatitis').value = '0级';
+            document.getElementById('fAeDiarrhea').value = '0级';
+            document.getElementById('fAeRash').value = '0级';
+            document.getElementById('fNotes').value = '';
+            document.getElementById('fNextDate').value = getDateOffset(stageInfo.recommendedNextDays);
+
+            // 重置右侧实时SOP决策框
+            document.getElementById('liveDecisionBox').innerHTML = `
+                <div class="text-center text-slate-400 text-xs py-8">
+                    <i class="fa-solid fa-robot text-2xl mb-2 text-slate-300 block"></i>
+                    输入左侧空腹血糖（FPG）后，系统将自动匹配<br><strong>SOP决策矩阵、剂量调整规则及患教沟通话术</strong>
+                </div>
+            `;
+
+            renderGlucoseChart(p);
+            renderFollowupHistory(p);
+            openModal('patientDetailModal');
+        }
+
+        // 动态绘制SVG血糖趋势折线图
+        function renderGlucoseChart(patient) {
+            const container = document.getElementById('glucoseChartContainer');
+            const recs = patient.records;
+            if (!recs || recs.length === 0) {
+                container.innerHTML = '<p class="text-xs text-slate-400">暂无血糖监测数据</p>';
+                return;
+            }
+
+            const width = 680;
+            const height = 165;
+            const padLeft = 38;
+            const padRight = 25;
+            const padTop = 20;
+            const padBottom = 28;
+            const chartW = width - padLeft - padRight;
+            const chartH = height - padTop - padBottom;
+
+            const maxVal = Math.max(16, ...recs.map(r => r.fpg + 2));
+            const minVal = 3;
+
+            const getX = (idx) => {
+                if (recs.length === 1) return padLeft + chartW / 2;
+                return padLeft + (idx / (recs.length - 1)) * chartW;
+            };
+            const getY = (val) => {
+                return padTop + chartH - ((val - minVal) / (maxVal - minVal)) * chartH;
+            };
+
+            const y89 = getY(8.9);
+            const y139 = getY(13.9);
+
+            // 构建折线路径
+            const points = recs.map((r, i) => `${getX(i)},${getY(r.fpg)}`).join(' ');
+
+            let svgHtml = `
+                <svg viewBox="0 0 ${width} ${height}" class="w-full h-full overflow-visible">
+                    <!-- 背景警戒区域 -->
+                    <rect x="${padLeft}" y="${padTop}" width="${chartW}" height="${Math.max(0, y139 - padTop)}" fill="#fff1f2" opacity="0.6" />
+                    <rect x="${padLeft}" y="${y139}" width="${chartW}" height="${Math.max(0, y89 - y139)}" fill="#fffbeb" opacity="0.6" />
+                    
+                    <!-- 警戒虚线 13.9 -->
+                    <line x1="${padLeft}" y1="${y139}" x2="${width - padRight}" y2="${y139}" stroke="#f43f5e" stroke-width="1.2" stroke-dasharray="4,4" />
+                    <text x="${padLeft - 5}" y="${y139 + 3}" text-anchor="end" font-size="9" fill="#e11d48" font-weight="bold">13.9</text>
+
+                    <!-- 目标上限虚线 8.9 -->
+                    <line x1="${padLeft}" y1="${y89}" x2="${width - padRight}" y2="${y89}" stroke="#10b981" stroke-width="1.2" stroke-dasharray="4,4" />
+                    <text x="${padLeft - 5}" y="${y89 + 3}" text-anchor="end" font-size="9" fill="#059669" font-weight="bold">8.9</text>
+
+                    <!-- 坐标轴底线 -->
+                    <line x1="${padLeft}" y1="${height - padBottom}" x2="${width - padRight}" y2="${height - padBottom}" stroke="#cbd5e1" stroke-width="1" />
+
+                    <!-- 趋势连线 -->
+                    ${recs.length > 1 ? `<polyline fill="none" stroke="#0f766e" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" points="${points}" />` : ''}
+
+                    <!-- 数据节点 -->
+                    ${recs.map((r, i) => {
+                        const cx = getX(i);
+                        const cy = getY(r.fpg);
+                        let dotColor = '#10b981';
+                        if (r.fpg > 13.9) dotColor = '#e11d48';
+                        else if (r.fpg > 8.9) dotColor = '#f59e0b';
+
+                        return `
+                            <g>
+                                <circle cx="${cx}" cy="${cy}" r="5" fill="${dotColor}" stroke="#ffffff" stroke-width="2" />
+                                <text x="${cx}" y="${cy - 9}" text-anchor="middle" font-size="10" font-weight="bold" fill="#1e293b">${r.fpg}</text>
+                                <text x="${cx}" y="${height - 10}" text-anchor="middle" font-size="9" fill="#64748b">${r.date.slice(5)}</text>
+                            </g>
+                        `;
+                    }).join('')}
+                </svg>
+            `;
+            container.innerHTML = svgHtml;
+        }
+
+        // 随访表单输入血糖时，实时更新右侧SOP决策与话术
+        function updateLiveSopDecision() {
+            const fpgVal = document.getElementById('fFpg').value;
+            const symHyper = document.getElementById('fSymHyper').checked;
+            const symDka = document.getElementById('fSymDka').checked;
+            const box = document.getElementById('liveDecisionBox');
+
+            const decision = evaluateGlucoseDecision(fpgVal, symHyper, symDka);
+            if (!decision) return;
+
+            // 自动调整下次随访建议时间（如果Grade 2级，自动建议2天后加密随访；Grade 3级建议1天后）
+            if (decision.level === 2) {
+                document.getElementById('fNextDate').value = getDateOffset(2);
+            } else if (decision.level >= 3) {
+                document.getElementById('fNextDate').value = getDateOffset(1);
+            }
+
+            box.innerHTML = renderDecisionCardHtml(decision);
+        }
+
+        // 即时评估器 Tab 逻辑
+        function runQuickDecision() {
+            const fpgVal = document.getElementById('quickFpgInput').value;
+            const symHyper = document.getElementById('quickSymThirst').checked;
+            const symDka = document.getElementById('quickSymDka').checked;
+            const output = document.getElementById('quickDecisionOutput');
+
+            const decision = evaluateGlucoseDecision(fpgVal, symHyper, symDka);
+            if (!decision) {
+                output.className = 'rounded-2xl p-5 bg-slate-50 border border-slate-200 text-center text-sm text-slate-400';
+                output.innerHTML = '请在上方输入空腹血糖数值以获取标准化处置方案';
+                return;
+            }
+            output.className = 'text-left';
+            output.innerHTML = renderDecisionCardHtml(decision);
+        }
+
+        function renderDecisionCardHtml(decision) {
+            return `
+                <div class="rounded-2xl p-4 border ${decision.cardClass} space-y-3">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-extrabold px-2.5 py-1 rounded-lg ${decision.badgeClass}">${decision.grade}</span>
+                        <span class="text-[11px] font-semibold opacity-80">随访频次：${decision.followFreq}</span>
+                    </div>
+                    <div>
+                        <div class="font-bold text-sm">${decision.actionTitle}</div>
+                        <p class="text-xs mt-1 opacity-90 leading-relaxed">${decision.doseRule}</p>
+                    </div>
+                    <div class="bg-white/80 rounded-xl p-3 border border-black/5 space-y-2 text-xs">
+                        <div>
+                            <div class="flex items-center justify-between font-bold text-teal-900 mb-0.5">
+                                <span>🗣️ 向患者传递标准话术：</span>
+                                <button type="button" onclick="copyText('${decision.patientScript.replace(/'/g, "\\'")}')" class="text-[10px] bg-teal-700 text-white px-2 py-0.5 rounded hover:bg-teal-600">一键复制</button>
+                            </div>
+                            <p class="text-slate-700 italic leading-relaxed">${decision.patientScript}</p>
+                        </div>
+                        <div class="pt-1.5 border-t border-slate-200/70">
+                            <div class="flex items-center justify-between font-bold text-slate-800 mb-0.5">
+                                <span>👨‍⚕️ 向主治医生汇报模板：</span>
+                                <button type="button" onclick="copyText('${decision.doctorScript.replace(/'/g, "\\'")}')" class="text-[10px] bg-slate-700 text-white px-2 py-0.5 rounded hover:bg-slate-600">一键复制</button>
+                            </div>
+                            <p class="text-slate-600 leading-relaxed">${decision.doctorScript}</p>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderFollowupHistory(patient) {
+            const container = document.getElementById('followupHistoryList');
+            const reversed = [...patient.records].reverse();
+
+            container.innerHTML = reversed.map(rec => {
+                const dec = evaluateGlucoseDecision(rec.fpg, rec.symHyper, rec.symDka);
+                return `
+                    <div class="bg-white p-4 rounded-2xl border border-slate-200/90 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div class="space-y-1.5">
+                            <div class="flex flex-wrap items-center gap-2">
+                                <span class="font-bold text-xs text-slate-800 bg-slate-100 px-2.5 py-1 rounded-lg">${rec.date}</span>
+                                <span class="text-sm font-extrabold ${rec.fpg > 13.9 ? 'text-rose-600' : (rec.fpg > 8.9 ? 'text-amber-600' : 'text-emerald-600')}">
+                                    FPG: ${rec.fpg.toFixed(1)} mmol/L
+                                </span>
+                                <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full ${dec.badgeClass}">${dec.grade}</span>
+                                ${rec.hba1c ? `<span class="text-[11px] bg-purple-50 text-purple-700 px-2 py-0.5 rounded-md font-medium">HbA1c: ${rec.hba1c}%</span>` : ''}
+                            </div>
+                            <div class="flex flex-wrap gap-2 text-[11px] text-slate-600">
+                                <span><strong>伊那利塞：</strong>${rec.inavoStatus}</span>
+                                <span>|</span>
+                                <span><strong>降糖方案：</strong>${rec.antiDiabetic}</span>
+                                <span>|</span>
+                                <span><strong>AE评估：</strong>口腔炎(${rec.ae.stomatitis}) 腹泻(${rec.ae.diarrhea}) 皮疹(${rec.ae.rash})</span>
+                            </div>
+                            ${rec.notes ? `<p class="text-xs text-slate-500 bg-slate-50 p-2 rounded-lg">${rec.notes}</p>` : ''}
+                        </div>
+                        <div class="text-left sm:text-right shrink-0 text-[11px] text-slate-400">
+                            下次随访：<strong class="text-slate-600">${rec.nextDate}</strong>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function saveFollowupRecord(event) {
+            event.preventDefault();
+            const p = patients.find(item => item.id === activePatientId);
+            if (!p) return;
+
+            const fpgVal = parseFloat(document.getElementById('fFpg').value);
+            const hba1cVal = document.getElementById('fHba1c').value ? parseFloat(document.getElementById('fHba1c').value) : null;
+
+            const newRec = {
+                id: 'REC-' + Date.now(),
+                date: document.getElementById('fDate').value,
+                fpg: fpgVal,
+                hba1c: hba1cVal,
+                antiDiabetic: document.getElementById('fAntiDiabetic').value,
+                symHyper: document.getElementById('fSymHyper').checked,
+                symDka: document.getElementById('fSymDka').checked,
+                ae: {
+                    stomatitis: document.getElementById('fAeStomatitis').value,
+                    diarrhea: document.getElementById('fAeDiarrhea').value,
+                    rash: document.getElementById('fAeRash').value
+                },
+                inavoStatus: document.getElementById('fInavoStatus').value,
+                nextDate: document.getElementById('fNextDate').value,
+                notes: document.getElementById('fNotes').value.trim()
+            };
+
+            p.records.push(newRec);
+            saveToStorage();
+            renderAll();
+            openPatientDetail(p.id);
+            showToast('随访记录已保存，趋势图及随访日程已更新！');
+        }
+
+        // ==================== 首次建档逻辑 ====================
+        function openNewPatientModal() {
+            document.getElementById('newPatientForm').reset();
+            document.getElementById('pStartDate').value = getDateOffset(0);
+            evaluateBaselineRisk();
+            openModal('newPatientModal');
+        }
+
+        function evaluateBaselineRisk() {
+            const age = parseFloat(document.getElementById('pAge').value);
+            const hba1c = parseFloat(document.getElementById('pBaseHba1c').value);
+            const bmi = parseFloat(document.getElementById('pBmi').value);
+
+            if (!isNaN(age)) document.getElementById('chkAge').checked = age > 45;
+            if (!isNaN(hba1c)) document.getElementById('chkHba1c').checked = hba1c >= 5.7;
+            if (!isNaN(bmi)) document.getElementById('chkBmi').checked = bmi >= 28;
+
+            const checkedCount = document.querySelectorAll('.risk-checkbox:checked').length;
+            const badge = document.getElementById('riskResultBadge');
+            const tip = document.getElementById('highRiskTip');
+
+            if (checkedCount >= 1) {
+                badge.className = 'text-xs font-bold px-2.5 py-0.5 rounded-full bg-amber-600 text-white';
+                badge.innerText = `高风险 (${checkedCount}项阳性)`;
+                tip.classList.remove('hidden');
+            } else {
+                badge.className = 'text-xs font-bold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800';
+                badge.innerText = '低风险 (0项阳性)';
+                tip.classList.add('hidden');
+            }
+        }
+
+        function saveNewPatient(event) {
+            event.preventDefault();
+            const risks = Array.from(document.querySelectorAll('.risk-checkbox:checked')).map(cb => cb.value);
+            const isHigh = risks.length >= 1;
+            const startDate = document.getElementById('pStartDate').value;
+            const baseFpg = parseFloat(document.getElementById('pBaseFpg').value);
+            const baseHba1c = parseFloat(document.getElementById('pBaseHba1c').value);
+            const dose = document.getElementById('pDose').value;
+
+            const newPatient = {
+                id: 'PT-' + Math.floor(100000 + Math.random() * 900000),
+                name: document.getElementById('pName').value.trim(),
+                age: parseInt(document.getElementById('pAge').value, 10),
+                phone: document.getElementById('pPhone').value.trim(),
+                startDate: startDate,
+                dose: dose,
+                doctor: document.getElementById('pDoctor').value.trim() || '主治医生',
+                baseFpg: baseFpg,
+                baseHba1c: baseHba1c,
+                bmi: parseFloat(document.getElementById('pBmi').value) || null,
+                riskFactors: risks,
+                riskLevel: isHigh ? 'HIGH' : 'LOW',
+                eduChecklist: {
+                    kit: document.getElementById('eduKit').checked,
+                    meter: document.getElementById('eduMeter').checked,
+                    target: document.getElementById('eduTarget').checked,
+                    mouthwash: document.getElementById('eduMouthwash').checked
+                },
+                records: [
+                    {
+                        id: 'REC-' + Date.now(),
+                        date: startDate,
+                        fpg: baseFpg,
+                        hba1c: baseHba1c,
+                        antiDiabetic: isHigh ? '二甲双胍 (1L首选)' : '暂未用药(生活方式干预)',
+                        symHyper: false,
+                        symDka: false,
+                        ae: { stomatitis: '0级', diarrhea: '0级', rash: '0级' },
+                        inavoStatus: `${dose} 正常服药`,
+                        nextDate: getDateOffset(3), // 首次购药后第1周每3天随访1次
+                        notes: `【首次购药建档】评估为${isHigh ? '高风险(' + risks.join('、') + ')' : '低风险'}，已完成血糖仪操作教学与患教指导，约定3天后首次电话随访。`
+                    }
+                ]
+            };
+
+            patients.unshift(newPatient);
+            saveToStorage();
+            renderAll();
+            closeModal('newPatientModal');
+            showToast(`已成功为 ${newPatient.name} 建立伊赫莱随访档案！`);
+        }
+
+        // ==================== 通用 UI 交互工具 ====================
+        function switchMainTab(tabName) {
+            ['patients', 'todos', 'calculator'].forEach(t => {
+                document.getElementById(`view-${t}`).classList.add('hidden');
+                const btn = document.getElementById(`tab-${t}`);
+                btn.className = 'flex-1 py-2.5 px-3 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-100 transition flex items-center justify-center space-x-2';
+            });
+
+            document.getElementById(`view-${tabName}`).classList.remove('hidden');
+            const activeBtn = document.getElementById(`tab-${tabName}`);
+            activeBtn.className = 'flex-1 py-2.5 px-3 rounded-xl text-sm font-semibold transition flex items-center justify-center space-x-2 bg-teal-700 text-white shadow-sm';
+        }
+
+        function openModal(id) {
+            document.getElementById(id).classList.remove('hidden');
+        }
+
+        function closeModal(id) {
+            document.getElementById(id).classList.add('hidden');
+        }
+
+        function openSopModal() {
+            openModal('sopModal');
+        }
+
+        function copyText(text) {
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            document.body.appendChild(textarea);
+            textarea.select();
+            try {
+                document.execCommand('copy');
+                showToast('话术已复制到剪贴板，可直接粘贴发送！');
+            } catch (err) {
+                showToast('复制失败，请手动长按选择复制');
+            }
+            document.body.removeChild(textarea);
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toastMsg').innerText = msg;
+            toast.classList.remove('opacity-0', 'pointer-events-none');
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'pointer-events-none');
+            }, 2600);
+        }
+
+        // 启动应用
+        window.onload = initApp;
+    </script>
+</body>
+</html>
